@@ -56,6 +56,25 @@ public:
      * Signal that crawling is complete
      */
     void mark_done();
+
+    /**
+     * Create a copy of the internal queue (for read-only dumping).
+     * NOTE: Callers should ensure no concurrent modifications (safe after crawl complete).
+     */
+    std::queue<std::string> copy_queue() const;
+
+    /**
+     * Create a copy of the visited set (read-only).
+     */
+    std::unordered_set<std::string> copy_visited() const; 
+
+    /**
+     * Snapshot helpers for debugging/dumping (return copies)
+     * These are safe to call and will copy internal structures for
+     * evaluator-friendly output. No mutation is performed.
+     */
+    std::queue<std::string> get_queue_snapshot();
+    std::unordered_set<std::string> get_visited_snapshot();
     
     /**
      * Batch enqueue multiple URLs (called from parser)
@@ -71,7 +90,7 @@ private:
     std::atomic<size_t> queue_size_{0};
     
     // Minimal lock - ONLY protects the queue operations
-    std::mutex queue_mutex;
+    mutable std::mutex queue_mutex;
 };
 
 #endif // URL_FRONTIER_H

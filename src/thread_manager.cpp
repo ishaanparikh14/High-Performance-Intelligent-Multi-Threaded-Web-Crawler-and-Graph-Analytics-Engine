@@ -1,4 +1,5 @@
 #include "thread_manager.h"
+#include "DumpUtils.h"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -120,10 +121,25 @@ void ThreadManager::wait_completion() {
             thread.join();
         }
     }
+
+#if DEBUG_DUMP
+    // Dump frontier and visited set (safe - worker threads have joined)
+    DumpUtils::dump_frontier(frontier.copy_queue());
+    DumpUtils::dump_visited(frontier.copy_visited());
+#endif
     
     frontier.mark_done();
     std::cout << "\n[CRAWL COMPLETE]" << std::endl;
     std::cout << "Total pages crawled: " << pages_crawled.load() << std::endl;
+} 
+
+void ThreadManager::dump_frontier_and_visited() {
+#if DEBUG_DUMP
+    auto q = frontier.get_queue_snapshot();
+    auto v = frontier.get_visited_snapshot();
+    DumpUtils::dump_frontier(q);
+    DumpUtils::dump_visited(v);
+#endif
 }
 
 int ThreadManager::get_pages_crawled() const {

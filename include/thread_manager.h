@@ -32,6 +32,11 @@ public:
     void wait_completion();
     
     /**
+     * Dump frontier and visited snapshots for debugging (guarded by DEBUG_DUMP)
+     */
+    void dump_frontier_and_visited();
+
+    /**
      * Get number of pages crawled so far
      */
     int get_pages_crawled() const;

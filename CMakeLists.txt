@@ -11,6 +11,16 @@ find_package(Threads REQUIRED)
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+# Option to enable/disable debug dumps at build time
+option(ENABLE_DUMP "Enable debug dump utilities (controls DEBUG_DUMP macro)" ON)
+if(ENABLE_DUMP)
+    message(STATUS "DEBUG_DUMP enabled")
+    add_compile_definitions(DEBUG_DUMP=1)
+else()
+    message(STATUS "DEBUG_DUMP disabled")
+    add_compile_definitions(DEBUG_DUMP=0)
+endif()
+
 # Source files - using absolute paths for safety
 set(SOURCES
     "${CMAKE_SOURCE_DIR}/src/downloader.cpp"
@@ -20,6 +30,7 @@ set(SOURCES
     "${CMAKE_SOURCE_DIR}/src/thread_manager.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils.cpp"
     "${CMAKE_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_SOURCE_DIR}/src/DumpUtils.cpp"
 )
 
 # Verify source files exist
@@ -40,6 +51,15 @@ target_link_libraries(crawler PRIVATE
 
 # Include curl headers
 target_include_directories(crawler PRIVATE ${CURL_INCLUDE_DIRS})
+
+# Build-time toggle for debug dump outputs (defines DEBUG_DUMP)
+option(ENABLE_DUMP "Enable debug dump outputs (defines DEBUG_DUMP)" ON)
+
+if(ENABLE_DUMP)
+    target_compile_definitions(crawler PRIVATE DEBUG_DUMP=1)
+else()
+    target_compile_definitions(crawler PRIVATE DEBUG_DUMP=0)
+endif()
 
 # Compiler flags
 if(UNIX)

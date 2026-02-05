@@ -63,6 +63,16 @@ void URLFrontier::mark_done() {
     is_done.store(true);
 }
 
+std::queue<std::string> URLFrontier::copy_queue() const {
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    return to_visit;
+}
+
+std::unordered_set<std::string> URLFrontier::copy_visited() const {
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    return visited;
+}
+
 int URLFrontier::batch_enqueue(const std::vector<std::string>& urls) {
     int added = 0;
     
@@ -73,4 +83,14 @@ int URLFrontier::batch_enqueue(const std::vector<std::string>& urls) {
     }
     
     return added;
+} 
+
+std::queue<std::string> URLFrontier::get_queue_snapshot() {
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    return to_visit; // copy
+}
+
+std::unordered_set<std::string> URLFrontier::get_visited_snapshot() {
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    return visited; // copy
 }

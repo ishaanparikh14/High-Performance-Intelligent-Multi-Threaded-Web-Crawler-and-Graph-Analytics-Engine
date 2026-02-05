@@ -82,6 +82,11 @@ int main(int argc, char* argv[]) {
     
     // Wait for all threads to complete
     crawler.wait_completion();
+
+#if DEBUG_DUMP
+    // Dump frontier and visited snapshot for debugging
+    crawler.dump_frontier_and_visited();
+#endif
     
     auto crawl_end = std::chrono::high_resolution_clock::now();
     auto crawl_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
