@@ -1,0 +1,113 @@
+# Linux Setup Summary — Multi-Threaded Web Crawler
+
+## What This Project Is
+A C++ multi-threaded web crawler with graph analytics (PageRank, Tarjan SCC, Topological Sort), a Flask REST API, and an interactive dashboard. Built as a DAA course project.
+
+---
+
+## Step 1: Clone the Repo
+```bash
+git clone https://github.com/ishaanparikh14/multithreaded-web-crawler.git
+cd multithreaded-web-crawler
+```
+
+---
+
+## Step 2: Install Dependencies
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install cmake build-essential libcurl4-openssl-dev python3 python3-pip -y
+
+# Fedora/CentOS
+sudo dnf install cmake gcc-c++ libcurl-devel python3 python3-pip -y
+```
+
+---
+
+## Step 3: Build the C++ Crawler
+```bash
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+cd ..
+```
+
+Binary will be at `./build/crawler`
+
+---
+
+## Step 4: Install Python Dependencies
+```bash
+pip3 install -r requirements.txt
+```
+
+---
+
+## Step 5: Run Everything
+
+**Terminal 1 — API Server:**
+```bash
+python3 api_server.py
+```
+Runs on `http://localhost:5000`
+
+**Terminal 2 — Dashboard:**
+```bash
+cd dashboard
+python3 -m http.server 8080
+```
+Open browser: `http://localhost:8080`
+
+---
+
+## Step 6: Use the Dashboard
+1. Enter a seed URL (e.g. `https://github.com`)
+2. Choose strategy: `bfs`, `dfs`, or `priority`
+3. Set max pages and threads
+4. Click **Start Crawl**
+5. Watch live progress
+6. Results auto-load in Analytics and Benchmarks tabs
+
+---
+
+## Or Run Crawler Directly (No Dashboard)
+```bash
+./build/crawler https://github.com 50 4 bfs
+```
+CSVs are written to `output/` — then `python3 api_server.py` serves them.
+
+---
+
+## Project Structure (What Matters)
+```
+├── src/                  # C++ source
+├── include/              # C++ headers
+├── dashboard/index.html  # Frontend UI
+├── api_server.py         # Flask REST API
+├── requirements.txt      # Python deps
+├── CMakeLists.txt        # Build config
+└── output/               # CSV files (auto-generated after crawl)
+```
+
+---
+
+## Algorithms Implemented
+| Algorithm | Complexity | Purpose |
+|-----------|-----------|---------|
+| BFS | O(V+E) | Breadth-first crawling |
+| Priority Queue | O(E log V) | Best-first crawling |
+| PageRank | O(k·E) | Domain ranking |
+| Tarjan SCC | O(V+E) | Community detection |
+| Topological Sort | O(V+E) | Dependency ordering |
+
+---
+
+## Troubleshooting
+| Problem | Fix |
+|---------|-----|
+| `cmake not found` | `sudo apt install cmake` |
+| `curl/curl.h not found` | `sudo apt install libcurl4-openssl-dev` |
+| `make` fails | Check `g++` is installed: `sudo apt install build-essential` |
+| API not reachable | Make sure `python3 api_server.py` is running |
+| Empty dashboard | Run a crawl first to generate CSVs in `output/` |
