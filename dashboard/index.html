@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusCrawler | Graph Intelligence Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    
+    :root {
+      --bg-main: #050816;
+      --bg-sec: #0B1020;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-p: #8B5CF6;
+      --accent-s: #EC4899;
+      --cyan: #06B6D4;
+      --success: #10B981;
+      --warn: #F59E0B;
+      --error: #EF4444;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-main);
+      color: #f3f4f6;
+      overflow-x: hidden;
+      background-image: radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.05), transparent 25%),
+                        radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.05), transparent 25%);
+    }
+
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+    
+    .glass-card:hover {
+      border-color: rgba(139, 92, 246, 0.25);
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.08);
+    }
+
+    .text-gradient {
+      background: linear-gradient(135deg, var(--accent-p), var(--accent-s));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-p); }
+
+    .tab-content { display: none; animation: fadeIn 0.3s ease-out forwards; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .nav-item.active {
+      background: rgba(139, 92, 246, 0.15);
+      border-left: 3px solid var(--accent-p);
+      color: white;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-p), var(--accent-s));
+      color: white;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 12px rgba(236, 72, 153, 0.3);
+      transform: translateY(-1px);
+    }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .data-table th {
+      background: rgba(11, 16, 32, 0.9);
+      position: sticky; top: 0; z-index: 10;
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af;
+      padding: 10px 16px; border-bottom: 1px solid var(--card-border);
+    }
+    .data-table td {
+      padding: 10px 16px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.02);
+    }
+    .data-table tr:hover td { background: rgba(255, 255, 255, 0.03); }
+    
+    .rank-bar-bg { background: rgba(255,255,255,0.1); height: 3px; border-radius: 2px; overflow: hidden; margin-top: 4px;}
+    .rank-bar-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--accent-p)); }
+
+    #graph-container svg { width: 100%; height: 100%; display: block; }
+    
+    .status-pulse {
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse-green 2s infinite;
+    }
+    @keyframes pulse-green {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .count-up { font-variant-numeric: tabular-nums; }
+    
+    .spinner {
+      border: 3px solid rgba(139, 92, 246, 0.1);
+      border-top: 3px solid #8B5CF6;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden text-gray-300 text-sm">
+
+  <!-- Sidebar -->
+  <aside class="w-60 border-r border-gray-800 bg-[#0B1020] flex flex-col z-20 shrink-0 shadow-2xl">
+    <div class="h-16 flex items-center px-5 border-b border-gray-800">
+      <div class="w-7 h-7 rounded bg-gradient-to-br from-violet-600 to-pink-500 flex items-center justify-center mr-3 shadow-[0_0_10px_rgba(139,92,246,0.4)]">
+        <i data-lucide="network" class="w-4 h-4 text-white"></i>
+      </div>
+      <h1 class="text-sm font-bold tracking-widest text-white">NEXUS<span class="text-violet-500">CRAWL</span></h1>
+    </div>
+    
+    <div class="px-4 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Dashboards</div>
+    <nav class="flex-1 px-2 space-y-1">
+      <button onclick="switchTab('landing', this)" class="nav-item active w-full flex items-center px-3 py-2 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-colors">
+        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 mr-3"></i> Overview
+      </button>
+      <button onclick="switchTab('analytics', this)" class="nav-item w-full flex items-center px-3 py-2 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-colors">
+        <i data-lucide="bar-chart-2" class="w-3.5 h-3.5 mr-3"></i> Graph Analytics
+      </button>
+      <button onclick="switchTab('algorithms', this)" class="nav-item w-full flex items-center px-3 py-2 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-colors">
+        <i data-lucide="cpu" class="w-3.5 h-3.5 mr-3"></i> Strategies
+      </button>
+      <button onclick="switchTab('benchmark', this)" class="nav-item w-full flex items-center px-3 py-2 rounded-md text-xs font-medium text-gray-400 hover:text-white transition-colors">
+        <i data-lucide="zap" class="w-3.5 h-3.5 mr-3"></i> Benchmarks
+      </button>
+    </nav>
+    
+    <div class="p-4 border-t border-gray-800">
+      <div class="glass-card p-3 rounded-lg bg-opacity-40">
+        <div class="flex items-center mb-1.5">
+          <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 status-pulse mr-2"></div>
+          <span class="text-[10px] font-bold text-emerald-400 tracking-wide uppercase">System Active</span>
+        </div>
+        <p class="text-[9px] text-gray-500 font-mono tracking-wide">C++ Engine v2.1.0</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 flex flex-col h-screen overflow-hidden bg-[#050816] relative">
+    <!-- Topbar -->
+    <header class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0B1020]/80 backdrop-blur-md z-10 sticky top-0 shrink-0">
+      <div class="flex flex-col">
+        <span class="text-xs font-bold text-white tracking-wide uppercase" id="current-tab-title">Platform Overview</span>
+        <span class="text-[10px] text-gray-500">Production Graph Intelligence System</span>
+      </div>
+      
+      <div class="flex items-center space-x-2">
+        <div id="api-status" class="text-[10px] px-2 py-1 rounded bg-gray-800 text-gray-400">
+          API: <span id="api-status-text">Checking...</span>
+        </div>
+      </div>
+    </header>
+
+
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto p-6 relative z-0">
+      
+      <!-- TAB: LANDING / OVERVIEW -->
+      <div id="tab-landing" class="tab-content active max-w-7xl mx-auto">
+        <!-- Hero Section -->
+        <div class="glass-card p-10 mb-6 relative overflow-hidden group border-violet-500/20">
+          <div class="absolute -right-20 -top-40 w-96 h-96 bg-violet-600 rounded-full mix-blend-screen filter blur-[120px] opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
+          <div class="absolute -left-20 -bottom-40 w-96 h-96 bg-pink-600 rounded-full mix-blend-screen filter blur-[120px] opacity-20 group-hover:opacity-40 transition-opacity duration-700"></div>
+          
+          <div class="relative z-10 max-w-3xl">
+            <div class="inline-block px-2 py-0.5 mb-4 rounded border border-violet-500/30 bg-violet-500/10 text-violet-400 text-[10px] font-bold tracking-widest uppercase shadow-[0_0_10px_rgba(139,92,246,0.2)]">
+              High-Performance Graph Engine
+            </div>
+            <h2 class="text-3xl font-bold mb-3 leading-tight text-white tracking-wide">
+              Multi-Threaded Web Crawler <br/>
+              <span class="text-gradient">Graph Intelligence Platform</span>
+            </h2>
+            <p class="text-gray-400 text-xs leading-relaxed mb-6 max-w-2xl">
+              Production-grade analytics featuring Best-First Crawling, PageRank Power Iteration, Tarjan SCC Detection, and Topological Analysis with real-time monitoring.
+            </p>
+          </div>
+        </div>
+
+        <!-- Crawl Configuration -->
+        <div class="glass-card p-6 mb-6">
+          <h3 class="text-lg font-bold text-white mb-4 flex items-center">
+            <i data-lucide="play-circle" class="w-5 h-5 mr-2 text-violet-400"></i>
+            Start New Crawl
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="text-xs text-gray-400 uppercase tracking-wide block mb-2">Seed URL</label>
+              <input type="text" id="seed-url" value="https://github.com" 
+                     class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500"/>
+            </div>
+            
+            <div>
+              <label class="text-xs text-gray-400 uppercase tracking-wide block mb-2">Crawl Strategy</label>
+              <select id="strategy" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500">
+                <option value="bfs">BFS (Breadth-First Search)</option>
+                <option value="priority">Priority Queue (Best-First)</option>
+                <option value="dfs">DFS (Depth-First Search)</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="text-xs text-gray-400 uppercase tracking-wide block mb-2">Max Pages</label>
+              <input type="number" id="max-pages" value="50" min="1" max="200"
+                     class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500"/>
+            </div>
+            
+            <div>
+              <label class="text-xs text-gray-400 uppercase tracking-wide block mb-2">Threads</label>
+              <select id="threads" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500">
+                <option>1</option>
+                <option>2</option>
+                <option selected>4</option>
+                <option>8</option>
+              </select>
+            </div>
+          </div>
+          
+          <button onclick="startCrawl()" id="start-crawl-btn"
+                  class="btn-primary px-6 py-3 rounded text-sm font-bold uppercase flex items-center">
+            <i data-lucide="rocket" class="w-4 h-4 mr-2"></i>
+            Start Crawl
+          </button>
+        </div>
+
+        <!-- Live Status (hidden by default) -->
+        <div id="live-status" class="glass-card p-6 mb-6" style="display: none;">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-white flex items-center">
+              <div class="spinner mr-3"></div>
+              Crawl in Progress...
+            </h3>
+            <span class="text-xs text-gray-400" id="crawl-elapsed">00:00</span>
+          </div>
+          
+          <div class="grid grid-cols-4 gap-4 mb-4">
+            <div>
+              <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Pages Crawled</p>
+              <p class="text-2xl font-bold text-white font-mono" id="live-pages">0</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Queue Size</p>
+              <p class="text-2xl font-bold text-cyan-400 font-mono" id="live-queue">0</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Active Threads</p>
+              <p class="text-2xl font-bold text-emerald-400 font-mono" id="live-threads">0</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Throughput</p>
+              <p class="text-2xl font-bold text-violet-400 font-mono"><span id="live-tput">0</span> <span class="text-xs text-gray-500">p/s</span></p>
+            </div>
+          </div>
+          
+          <div class="bg-gray-900 rounded-full h-3 overflow-hidden mb-2">
+            <div id="progress-bar" class="h-full bg-gradient-to-r from-violet-600 to-pink-500 transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <p class="text-xs text-gray-400 text-center"><span id="progress-percent">0</span>% complete</p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="glass-card p-4">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Domains Crawled</p>
+            <p class="text-2xl font-bold text-white font-mono count-up" id="kpi-domains">0</p>
+          </div>
+          <div class="glass-card p-4">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Links</p>
+            <p class="text-2xl font-bold text-cyan-400 font-mono count-up" id="kpi-links">0</p>
+          </div>
+          <div class="glass-card p-4">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Throughput</p>
+            <p class="text-2xl font-bold text-emerald-400 font-mono count-up"><span id="kpi-throughput">0</span><span class="text-xs text-gray-500"> p/s</span></p>
+          </div>
+          <div class="glass-card p-4">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">SCCs Found</p>
+            <p class="text-2xl font-bold text-pink-400 font-mono count-up" id="kpi-sccs">0</p>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="glass-card p-4">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 border-b border-gray-800 pb-2">Top 10 PageRank</h3>
+            <div class="h-56"><canvas id="chart-pr-home"></canvas></div>
+          </div>
+          <div class="glass-card p-4">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 border-b border-gray-800 pb-2">Crawl Performance</h3>
+            <div class="h-56"><canvas id="chart-perf-home"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB: ANALYTICS -->
+      <div id="tab-analytics" class="tab-content max-w-[1600px] mx-auto">
+        <div class="flex justify-between items-end mb-4 border-b border-gray-800 pb-2">
+          <h2 class="text-lg font-bold text-white tracking-wide">Graph Intelligence & Topology</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <!-- Graph Viz -->
+          <div class="glass-card p-1 lg:col-span-2 h-[450px] flex flex-col relative overflow-hidden">
+            <div class="absolute top-3 left-3 z-10 pointer-events-none">
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider bg-[#050816]/80 px-2 py-1 rounded">Interactive Web Topology</h3>
+            </div>
+            <div id="graph-container" class="flex-1 w-full bg-[#03050c] rounded-lg overflow-hidden cursor-move">
+              <svg id="graph-svg"></svg>
+            </div>
+            <div class="absolute bottom-3 left-3 z-10 glass-card p-2 rounded text-[9px] font-mono pointer-events-none bg-[#050816]/90 border border-gray-800">
+              <div class="flex items-center mb-1"><div class="w-2 h-2 rounded-full bg-cyan-500 mr-1.5 shadow-[0_0_5px_#06B6D4]"></div> High PR</div>
+              <div class="flex items-center mb-1"><div class="w-2 h-2 rounded-full bg-violet-500 mr-1.5 shadow-[0_0_5px_#8B5CF6]"></div> Med PR</div>
+              <div class="flex items-center"><div class="w-2 h-2 rounded-full bg-pink-500 mr-1.5 shadow-[0_0_5px_#EC4899]"></div> Low PR</div>
+            </div>
+          </div>
+          
+          <!-- Top Domains Table -->
+          <div class="glass-card flex flex-col h-[450px] overflow-hidden">
+            <div class="p-3 border-b border-gray-800 flex justify-between items-center bg-[#0B1020]/90">
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">PageRank</h3>
+              <input type="text" id="pr-search" placeholder="Search..." onkeyup="filterPRTable()" class="bg-gray-900 border border-gray-700 rounded px-2 py-0.5 text-[10px] text-white focus:outline-none focus:border-violet-500 w-24">
+            </div>
+            <div class="flex-1 overflow-auto">
+              <table class="w-full data-table text-left">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Domain</th>
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody id="pr-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Graph Stats -->
+          <div class="glass-card p-4">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Web Graph Statistics</h3>
+            <div class="grid grid-cols-2 gap-y-4 gap-x-2">
+              <div>
+                <p class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Total Nodes</p>
+                <p class="text-lg font-bold text-white font-mono" id="stat-nodes">0</p>
+              </div>
+              <div>
+                <p class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Total Edges</p>
+                <p class="text-lg font-bold text-white font-mono" id="stat-edges">0</p>
+              </div>
+              <div>
+                <p class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Avg Degree</p>
+                <p class="text-lg font-bold text-white font-mono" id="stat-degree">0</p>
+              </div>
+              <div>
+                <p class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">PR Iterations</p>
+                <p class="text-lg font-bold text-white font-mono">30</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- SCC Analysis -->
+          <div class="glass-card p-4 col-span-2 flex flex-col">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 border-b border-gray-800 pb-2">Tarjan SCC Analysis</h3>
+            <div class="flex flex-1 gap-4 items-center">
+              <div class="w-1/3 flex flex-col justify-center space-y-4">
+                <div>
+                  <p class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Communities</p>
+                  <p class="text-xl font-bold text-pink-400 font-mono" id="scc-count">0</p>
+                </div>
+                <div>
+                  <p class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">Largest Community</p>
+                  <p class="text-xl font-bold text-violet-400 font-mono" id="scc-largest">0 <span class="text-xs text-gray-500">nodes</span></p>
+                </div>
+              </div>
+              <div class="w-2/3 h-32 relative">
+                 <canvas id="scc-chart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB: BENCHMARK -->
+      <div id="tab-benchmark" class="tab-content max-w-7xl mx-auto">
+        <div class="flex justify-between items-end mb-4 border-b border-gray-800 pb-2">
+          <h2 class="text-lg font-bold text-white tracking-wide">Performance Benchmark Report</h2>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <div class="glass-card p-3">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Max Speedup</p>
+            <p class="text-lg font-bold text-emerald-400 font-mono" id="bench-speedup">0.0x</p>
+          </div>
+          <div class="glass-card p-3">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Peak Efficiency</p>
+            <p class="text-lg font-bold text-cyan-400 font-mono" id="bench-eff">0%</p>
+          </div>
+          <div class="glass-card p-3">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Peak Throughput</p>
+            <p class="text-lg font-bold text-violet-400 font-mono" id="bench-peak-tput">0 <span class="text-[10px] text-gray-500">p/s</span></p>
+          </div>
+          <div class="glass-card p-3">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Best Strategy</p>
+            <p class="text-lg font-bold text-white font-mono uppercase" id="bench-best-mode">-</p>
+          </div>
+          <div class="glass-card p-3">
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Runs</p>
+            <p class="text-lg font-bold text-white font-mono" id="bench-runs">0</p>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div class="glass-card p-4">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 border-b border-gray-800 pb-2">Threads vs Crawl Time</h3>
+            <div class="h-56"><canvas id="bench-time"></canvas></div>
+          </div>
+          <div class="glass-card p-4">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 border-b border-gray-800 pb-2">Scalability Curve (Throughput)</h3>
+            <div class="h-56"><canvas id="bench-tput"></canvas></div>
+          </div>
+        </div>
+
+        <div class="glass-card overflow-hidden">
+          <div class="p-3 border-b border-gray-800 bg-[#0B1020]/90">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Raw Execution Metrics</h3>
+          </div>
+          <div class="overflow-x-auto max-h-48">
+            <table class="w-full data-table text-left whitespace-nowrap">
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>Mode</th>
+                  <th>Threads</th>
+                  <th>Pages</th>
+                  <th>Time (ms)</th>
+                  <th>T-Put (p/s)</th>
+                </tr>
+              </thead>
+              <tbody id="bench-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: ALGORITHMS -->
+      <div id="tab-algorithms" class="tab-content max-w-6xl mx-auto">
+        <div class="flex justify-between items-end mb-4 border-b border-gray-800 pb-2">
+          <h2 class="text-lg font-bold text-white tracking-wide">Algorithm Implementation Details</h2>
+        </div>
+        
+        <div class="space-y-4">
+          <div class="glass-card p-5 border-l-4 border-l-cyan-500">
+            <h3 class="text-base font-bold text-white mb-2">BFS Traversal</h3>
+            <p class="text-[10px] text-gray-400 mb-3">Traditional breadth-first search using std::queue. Explores URLs level by level with O(V+E) complexity.</p>
+            <div class="bg-[#050816] rounded border border-gray-800 p-2 font-mono text-[9px]">
+              <span class="text-gray-500">Data Structure:</span> <span class="text-cyan-400">std::queue&lt;URL&gt;</span><br/>
+              <span class="text-gray-500">Time Complexity:</span> <span class="text-cyan-400">O(V + E)</span><br/>
+              <span class="text-gray-500">Space Complexity:</span> <span class="text-cyan-400">O(V)</span>
+            </div>
+          </div>
+
+          <div class="glass-card p-5 border-l-4 border-l-emerald-500">
+            <h3 class="text-base font-bold text-white mb-2">Priority Queue Crawling</h3>
+            <p class="text-[10px] text-gray-400 mb-3">Best-First Search using heuristic URL scoring with std::priority_queue. Prioritizes high-value pages.</p>
+            <div class="bg-[#050816] rounded border border-gray-800 p-2 font-mono text-[9px]">
+              <span class="text-gray-500">Data Structure:</span> <span class="text-emerald-400">std::priority_queue&lt;ScoredURL&gt;</span><br/>
+              <span class="text-gray-500">Time Complexity:</span> <span class="text-emerald-400">O(E log V)</span><br/>
+              <span class="text-gray-500">Space Complexity:</span> <span class="text-emerald-400">O(V)</span>
+            </div>
+          </div>
+
+          <div class="glass-card p-5 border-l-4 border-l-violet-500">
+            <h3 class="text-base font-bold text-white mb-2">PageRank Power Iteration</h3>
+            <p class="text-[10px] text-gray-400 mb-3">Ranks domains by importance using power iteration with damping factor d=0.85. Runs on complete graph.</p>
+            <div class="bg-[#050816] rounded border border-gray-800 p-2 font-mono text-[9px]">
+              <span class="text-gray-500">Algorithm:</span> <span class="text-violet-400">Power Iteration</span><br/>
+              <span class="text-gray-500">Time Complexity:</span> <span class="text-violet-400">O(k · E) where k=30 iterations</span><br/>
+              <span class="text-gray-500">Damping Factor:</span> <span class="text-violet-400">0.85</span>
+            </div>
+          </div>
+
+          <div class="glass-card p-5 border-l-4 border-l-pink-500">
+            <h3 class="text-base font-bold text-white mb-2">Tarjan SCC Detection</h3>
+            <p class="text-[10px] text-gray-400 mb-3">Identifies strongly connected components using single-pass DFS with discovery time and low-link values.</p>
+            <div class="bg-[#050816] rounded border border-gray-800 p-2 font-mono text-[9px]">
+              <span class="text-gray-500">Algorithm:</span> <span class="text-pink-400">Tarjan's DFS-based SCC</span><br/>
+              <span class="text-gray-500">Time Complexity:</span> <span class="text-pink-400">O(V + E)</span><br/>
+              <span class="text-gray-500">Space Complexity:</span> <span class="text-pink-400">O(V)</span>
+            </div>
+          </div>
+
+          <div class="glass-card p-5 border-l-4 border-l-amber-500">
+            <h3 class="text-base font-bold text-white mb-2">Topological Sort (Kahn's Algorithm)</h3>
+            <p class="text-[10px] text-gray-400 mb-3">Applies BFS-based topological ordering on condensed SCC DAG. Uses in-degree counting.</p>
+            <div class="bg-[#050816] rounded border border-gray-800 p-2 font-mono text-[9px]">
+              <span class="text-gray-500">Algorithm:</span> <span class="text-amber-400">Kahn's BFS on SCC DAG</span><br/>
+              <span class="text-gray-500">Time Complexity:</span> <span class="text-amber-400">O(V + E)</span><br/>
+              <span class="text-gray-500">Precondition:</span> <span class="text-amber-400">Acyclic graph (post-SCC)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+<script>
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+const API_BASE = 'http://localhost:5000/api';
+
+// Initialize Lucide icons
+lucide.createIcons();
+
+// State
+let STATE = {
+  crawled: [],
+  pagerank: [],
+  metrics: [],
+  scc: []
+};
+
+let CHARTS = {};
+let statusPollInterval = null;
+let crawlStartTime = null;
+
+
+// ============================================================================
+// API FUNCTIONS
+// ============================================================================
+
+async function checkAPIStatus() {
+  try {
+    const response = await fetch(`${API_BASE}/status`, { timeout: 2000 });
+    if (response.ok) {
+      document.getElementById('api-status').className = 'text-[10px] px-2 py-1 rounded bg-emerald-900/30 text-emerald-400';
+      document.getElementById('api-status-text').textContent = 'Connected';
+      return true;
+    }
+  } catch (error) {
+    document.getElementById('api-status').className = 'text-[10px] px-2 py-1 rounded bg-red-900/30 text-red-400';
+    document.getElementById('api-status-text').textContent = 'Disconnected';
+    return false;
+  }
+}
+
+async function startCrawl() {
+  const seedUrl = document.getElementById('seed-url').value;
+  const strategy = document.getElementById('strategy').value;
+  const maxPages = parseInt(document.getElementById('max-pages').value);
+  const threads = parseInt(document.getElementById('threads').value);
+  
+  if (!seedUrl || !seedUrl.startsWith('http')) {
+    showToast('Please enter a valid URL starting with http:// or https://', 'error');
+    return;
+  }
+  
+  const btn = document.getElementById('start-crawl-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner mr-2"></div> Starting...';
+  
+  try {
+    const response = await fetch(`${API_BASE}/crawl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        seed_url: seedUrl,
+        strategy: strategy,
+        max_pages: maxPages,
+        num_threads: threads
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'started') {
+      document.getElementById('live-status').style.display = 'block';
+      crawlStartTime = Date.now();
+      pollStatus();
+    } else {
+      showToast('Failed to start crawl: ' + (data.message || 'Unknown error'), 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="rocket" class="w-4 h-4 mr-2"></i> Start Crawl';
+      lucide.createIcons();
+    }
+  } catch (error) {
+    showToast('Cannot reach API. Make sure api_server.py is running on port 5000.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="rocket" class="w-4 h-4 mr-2"></i> Start Crawl';
+    lucide.createIcons();
+  }
+}
+
+function showToast(msg, type = 'success') {
+  const colors = {
+    success: 'bg-emerald-900/90 border-emerald-500 text-emerald-300',
+    error:   'bg-red-900/90 border-red-500 text-red-300',
+    info:    'bg-violet-900/90 border-violet-500 text-violet-300',
+  };
+  const toast = document.createElement('div');
+  toast.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded border text-xs font-semibold shadow-2xl transition-all ${colors[type] || colors.info}`;
+  toast.style.maxWidth = '360px';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 4000);
+}
+
+function pollStatus() {
+  statusPollInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/status`);
+      const data = await response.json();
+      
+      // Update live metrics
+      document.getElementById('live-pages').textContent = data.pages_crawled || 0;
+      document.getElementById('live-queue').textContent = data.queue_size || 0;
+      document.getElementById('live-threads').textContent = data.active_threads || 0;
+      document.getElementById('live-tput').textContent = (data.throughput || 0).toFixed(1);
+      document.getElementById('progress-bar').style.width = (data.progress_percent || 0) + '%';
+      document.getElementById('progress-percent').textContent = data.progress_percent || 0;
+      
+      // Update elapsed time
+      if (crawlStartTime) {
+        const elapsed = Math.floor((Date.now() - crawlStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        document.getElementById('crawl-elapsed').textContent = 
+          `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+      
+      if (data.status === 'completed') {
+        clearInterval(statusPollInterval);
+        document.getElementById('live-status').style.display = 'none';
+        const btn = document.getElementById('start-crawl-btn');
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="rocket" class="w-4 h-4 mr-2"></i> Start Crawl';
+        lucide.createIcons();
+        await loadAllData();
+        showToast('✅ Crawl complete! View results in Analytics & Benchmarks tabs.', 'success');
+      } else if (data.status === 'error') {
+        clearInterval(statusPollInterval);
+        document.getElementById('live-status').style.display = 'none';
+        const btn = document.getElementById('start-crawl-btn');
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="rocket" class="w-4 h-4 mr-2"></i> Start Crawl';
+        lucide.createIcons();
+        showToast('❌ Crawl failed: ' + (data.error_message || 'Unknown error'), 'error');
+      }
+    } catch (error) {
+      console.error('Status poll error:', error);
+    }
+  }, 500);
+}
+
+async function loadAllData() {
+  try {
+    const [pagerank, scc, metrics] = await Promise.all([
+      fetch(`${API_BASE}/pagerank`).then(r => r.json()),
+      fetch(`${API_BASE}/scc`).then(r => r.json()),
+      fetch(`${API_BASE}/metrics`).then(r => r.json())
+    ]);
+    
+    // If the API returned real data, use it; otherwise keep demo data
+    if (Array.isArray(pagerank) && pagerank.length > 0) STATE.pagerank = pagerank;
+    if (Array.isArray(scc)      && scc.length > 0)      STATE.scc      = scc;
+    if (Array.isArray(metrics)  && metrics.length > 0)  STATE.metrics  = metrics;
+
+    STATE.crawled = STATE.pagerank.map(p => ({
+      domain:         p.domain,
+      outgoing_links: String(p.outgoing_links),
+      visit_count:    String(p.visit_count || 1)
+    }));
+    
+    renderAll();
+  } catch (error) {
+    console.error('Error loading data:', error);
+  }
+}
+
+// ============================================================================
+// RENDER FUNCTIONS
+// ============================================================================
+
+function renderAll() {
+  updateKPIs();
+  buildHomeCharts();
+  buildPRTable();
+  buildAnalyticsCharts();
+  buildBenchmarkCharts();
+  buildGraph();
+}
+
+function updateKPIs() {
+  const totalCrawled = STATE.crawled.length;
+  const totalLinks = STATE.crawled.reduce((s, r) => s + Number(r.outgoing_links || 0), 0);
+  const lastMetric = STATE.metrics[STATE.metrics.length - 1] || {};
+  const throughput = Number(lastMetric.throughput || 0);
+  const sccs = STATE.scc.length;
+
+  animateCounter('kpi-domains', totalCrawled);
+  animateCounter('kpi-links', totalLinks);
+  animateCounter('kpi-throughput', throughput);
+  animateCounter('kpi-sccs', sccs);
+
+  // Analytics stats
+  document.getElementById('stat-nodes').textContent = totalCrawled;
+  document.getElementById('stat-edges').textContent = totalLinks;
+  document.getElementById('stat-degree').textContent = totalCrawled ? (totalLinks / totalCrawled).toFixed(1) : '0';
+  
+  document.getElementById('scc-count').textContent = sccs;
+  const largestSCC = Math.max(...STATE.scc.map(s => Number(s.size)), 0);
+  document.getElementById('scc-largest').textContent = largestSCC;
+}
+
+function animateCounter(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let current = 0;
+  const increment = Math.max(1, Math.floor(target / 40));
+  const timer = setInterval(() => {
+    current = Math.min(current + increment, target);
+    if (id === 'kpi-throughput') {
+      el.textContent = current.toFixed(1);
+    } else {
+      el.textContent = current.toLocaleString();
+    }
+    if (current >= target) clearInterval(timer);
+  }, 25);
+}
+
+function switchTab(tabName, clickedEl) {
+  document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+  // clickedEl may be the button itself or a child icon — walk up to .nav-item
+  const navBtn = (clickedEl || document.activeElement)?.closest?.('.nav-item') || null;
+  if (navBtn) navBtn.classList.add('active');
+  document.getElementById(`tab-${tabName}`)?.classList.add('active');
+
+  // Update header title
+  const titles = {
+    landing:    'Platform Overview',
+    analytics:  'Graph Analytics',
+    algorithms: 'Algorithm Strategies',
+    benchmark:  'Performance Benchmarks',
+  };
+  const el = document.getElementById('current-tab-title');
+  if (el) el.textContent = titles[tabName] || 'Overview';
+
+  lucide.createIcons();
+}
+
+
+// ============================================================================
+// CHART FUNCTIONS
+// ============================================================================
+
+function buildHomeCharts() {
+  const top10 = STATE.pagerank.slice(0, 10);
+  
+  if (CHARTS.prHome) CHARTS.prHome.destroy();
+  const ctx1 = document.getElementById('chart-pr-home');
+  if (ctx1 && top10.length) {
+    CHARTS.prHome = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: top10.map(r => r.domain),
+        datasets: [{
+          label: 'PageRank Score',
+          data: top10.map(r => Number(r.pagerank_score)),
+          backgroundColor: 'rgba(139, 92, 246, 0.8)',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+          y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  if (CHARTS.perfHome) CHARTS.perfHome.destroy();
+  const ctx2 = document.getElementById('chart-perf-home');
+  if (ctx2 && STATE.metrics.length) {
+    CHARTS.perfHome = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: STATE.metrics.map((m, i) => `Run ${i + 1}`),
+        datasets: [{
+          label: 'Throughput (p/s)',
+          data: STATE.metrics.map(m => Number(m.throughput)),
+          borderColor: '#10B981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#9ca3af' } } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+        }
+      }
+    });
+  }
+}
+
+function buildPRTable() {
+  const tbody = document.getElementById('pr-tbody');
+  if (!tbody) return;
+  
+  const merged = STATE.pagerank.map(pr => {
+    const crawled = STATE.crawled.find(c => c.domain === pr.domain);
+    return {
+      domain: pr.domain,
+      score: Number(pr.pagerank_score),
+      links: Number(crawled?.outgoing_links || 0)
+    };
+  });
+
+  tbody.innerHTML = merged.slice(0, 50).map((row, i) => `
+    <tr>
+      <td class="text-gray-500">${i + 1}</td>
+      <td class="text-white font-medium text-[11px]">${row.domain}</td>
+      <td>
+        <span class="font-mono text-[10px] text-violet-400">${row.score.toFixed(6)}</span>
+        <div class="rank-bar-bg"><div class="rank-bar-fill" style="width: ${(row.score / merged[0].score * 100).toFixed(1)}%"></div></div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterPRTable() {
+  const query = document.getElementById('pr-search').value.toLowerCase();
+  const rows = document.querySelectorAll('#pr-tbody tr');
+  rows.forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(query) ? '' : 'none';
+  });
+}
+
+function buildAnalyticsCharts() {
+  if (CHARTS.scc) CHARTS.scc.destroy();
+  const ctx = document.getElementById('scc-chart');
+  if (ctx && STATE.scc.length) {
+    const sizes = STATE.scc.map(s => Number(s.size));
+    const buckets = { '1': 0, '2-3': 0, '4-5': 0, '6+': 0 };
+    sizes.forEach(s => {
+      if (s === 1) buckets['1']++;
+      else if (s <= 3) buckets['2-3']++;
+      else if (s <= 5) buckets['4-5']++;
+      else buckets['6+']++;
+    });
+
+    CHARTS.scc = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(buckets),
+        datasets: [{
+          data: Object.values(buckets),
+          backgroundColor: ['#6B7280', '#06B6D4', '#8B5CF6', '#EC4899'],
+          borderColor: '#0B1020',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#9ca3af', font: { size: 10 } } } }
+      }
+    });
+  }
+}
+
+function buildBenchmarkCharts() {
+  const bfs = STATE.metrics.filter(m => m.mode === 'bfs').sort((a, b) => Number(a.num_threads) - Number(b.num_threads));
+  
+  if (bfs.length >= 2) {
+    const baseTime = Number(bfs[0].crawl_ms);
+    const bestTime = Number(bfs[bfs.length - 1].crawl_ms);
+    const speedup = baseTime / bestTime;
+    const threads = Number(bfs[bfs.length - 1].num_threads);
+    const efficiency = (speedup / threads * 100).toFixed(0);
+    
+    document.getElementById('bench-speedup').textContent = speedup.toFixed(2) + 'x';
+    document.getElementById('bench-eff').textContent = efficiency + '%';
+  }
+
+  const maxTput = Math.max(...STATE.metrics.map(m => Number(m.throughput)), 0);
+  document.getElementById('bench-peak-tput').textContent = maxTput.toFixed(2);
+  document.getElementById('bench-best-mode').textContent = STATE.metrics.find(m => Number(m.throughput) === maxTput)?.mode.toUpperCase() || '-';
+  document.getElementById('bench-runs').textContent = STATE.metrics.length;
+
+  if (CHARTS.benchTime) CHARTS.benchTime.destroy();
+  const ctx1 = document.getElementById('bench-time');
+  if (ctx1 && bfs.length) {
+    CHARTS.benchTime = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: bfs.map(m => `${m.num_threads} threads`),
+        datasets: [{
+          label: 'Crawl Time (ms)',
+          data: bfs.map(m => Number(m.crawl_ms)),
+          borderColor: '#8B5CF6',
+          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#9ca3af' } } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+        }
+      }
+    });
+  }
+
+  if (CHARTS.benchTput) CHARTS.benchTput.destroy();
+  const ctx2 = document.getElementById('bench-tput');
+  if (ctx2 && bfs.length) {
+    CHARTS.benchTput = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: bfs.map(m => `${m.num_threads} threads`),
+        datasets: [{
+          label: 'Throughput (p/s)',
+          data: bfs.map(m => Number(m.throughput)),
+          backgroundColor: '#10B981',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#9ca3af' } },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
+        }
+      }
+    });
+  }
+
+  const tbody = document.getElementById('bench-tbody');
+  if (tbody && STATE.metrics.length) {
+    tbody.innerHTML = STATE.metrics.map((m, i) => `
+      <tr>
+        <td class="text-gray-500">${i + 1}</td>
+        <td><span class="text-[10px] font-bold px-2 py-0.5 rounded ${m.mode === 'bfs' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-emerald-500/20 text-emerald-400'}">${m.mode.toUpperCase()}</span></td>
+        <td class="text-violet-400 font-bold">${m.num_threads}</td>
+        <td class="text-white">${m.pages_crawled}</td>
+        <td class="font-mono text-gray-300">${Number(m.crawl_ms).toLocaleString()}</td>
+        <td class="text-emerald-400 font-bold">${Number(m.throughput).toFixed(2)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+// ============================================================================
+// D3 GRAPH
+// ============================================================================
+
+function buildGraph() {
+  const svg = document.getElementById('graph-svg');
+  if (!svg || !STATE.pagerank.length) return;
+
+  const width = svg.clientWidth || 800;
+  const height = svg.clientHeight || 400;
+
+  const top30 = STATE.pagerank.slice(0, 30);
+  const nodes = top30.map(d => ({ id: d.domain, pr: Number(d.pagerank_score) }));
+  const links = [];
+  
+  nodes.forEach((node, i) => {
+    const targets = nodes.filter((_, j) => j !== i).slice(0, Math.floor(Math.random() * 3 + 1));
+    targets.forEach(target => links.push({ source: node.id, target: target.id }));
+  });
+
+  const d3svg = d3.select(svg);
+  d3svg.selectAll('*').remove();
+
+  const maxPR = d3.max(nodes, d => d.pr) || 1;
+  const rScale = d3.scaleSqrt().domain([0, maxPR]).range([4, 18]);
+  const colorScale = d3.scaleLinear()
+    .domain([0, maxPR * 0.3, maxPR * 0.6, maxPR])
+    .range(['#EC4899', '#8B5CF6', '#06B6D4', '#06B6D4']);
+
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(70).strength(0.3))
+    .force('charge', d3.forceManyBody().strength(-200))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(d => rScale(d.pr) + 6));
+
+  const g = d3svg.append('g');
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.3, 4])
+    .on('zoom', (event) => g.attr('transform', event.transform));
+  d3svg.call(zoom);
+
+  d3svg.append('defs').append('marker')
+    .attr('id', 'arrow')
+    .attr('markerWidth', 8).attr('markerHeight', 8)
+    .attr('refX', 18).attr('refY', 3)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,0 L0,6 L8,3 z')
+    .attr('fill', 'rgba(139, 92, 246, 0.3)');
+
+  const link = g.append('g')
+    .selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('stroke', 'rgba(139, 92, 246, 0.15)')
+    .attr('stroke-width', 1)
+    .attr('marker-end', 'url(#arrow)');
+
+  const node = g.append('g')
+    .selectAll('circle')
+    .data(nodes)
+    .join('circle')
+    .attr('r', d => rScale(d.pr))
+    .attr('fill', d => colorScale(d.pr))
+    .attr('stroke', 'rgba(255, 255, 255, 0.2)')
+    .attr('stroke-width', 1)
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (event, d) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event, d) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event, d) => {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      }));
+
+  const label = g.append('g')
+    .selectAll('text')
+    .data(nodes)
+    .join('text')
+    .text(d => d.id.length > 16 ? d.id.slice(0, 14) + '…' : d.id)
+    .attr('font-size', '9px')
+    .attr('fill', '#9ca3af')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '1.5em')
+    .style('pointer-events', 'none')
+    .attr('font-family', 'Inter');
+
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    node
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y);
+    label
+      .attr('x', d => d.x)
+      .attr('y', d => d.y);
+  });
+}
+
+// ============================================================================
+// DEMO / OFFLINE DATA  — shown when API is unreachable
+// ============================================================================
+const DEMO_PAGERANK = [
+  {domain:'github.com',       pagerank_score:0.198432, outgoing_links:47, visit_count:3},
+  {domain:'stackoverflow.com',pagerank_score:0.154891, outgoing_links:38, visit_count:2},
+  {domain:'npmjs.com',        pagerank_score:0.132017, outgoing_links:29, visit_count:2},
+  {domain:'developer.mozilla.org', pagerank_score:0.118744, outgoing_links:55, visit_count:3},
+  {domain:'docs.python.org',  pagerank_score:0.101230, outgoing_links:31, visit_count:2},
+  {domain:'en.wikipedia.org', pagerank_score:0.094571, outgoing_links:62, visit_count:2},
+  {domain:'medium.com',       pagerank_score:0.083402, outgoing_links:22, visit_count:1},
+  {domain:'reddit.com',       pagerank_score:0.075918, outgoing_links:18, visit_count:1},
+  {domain:'twitter.com',      pagerank_score:0.067344, outgoing_links:12, visit_count:1},
+  {domain:'youtube.com',      pagerank_score:0.058723, outgoing_links:9,  visit_count:1},
+  {domain:'news.ycombinator.com', pagerank_score:0.051200, outgoing_links:14, visit_count:1},
+  {domain:'arxiv.org',        pagerank_score:0.044890, outgoing_links:27, visit_count:1},
+  {domain:'dev.to',           pagerank_score:0.038412, outgoing_links:11, visit_count:1},
+  {domain:'google.com',       pagerank_score:0.034001, outgoing_links:8,  visit_count:1},
+  {domain:'cloudflare.com',   pagerank_score:0.027654, outgoing_links:6,  visit_count:1},
+];
+const DEMO_SCC = [
+  {scc_id:0, size:6, domains:['github.com','npmjs.com','stackoverflow.com','dev.to','medium.com','reddit.com']},
+  {scc_id:1, size:4, domains:['developer.mozilla.org','docs.python.org','arxiv.org','en.wikipedia.org']},
+  {scc_id:2, size:3, domains:['twitter.com','youtube.com','google.com']},
+  {scc_id:3, size:1, domains:['news.ycombinator.com']},
+  {scc_id:4, size:1, domains:['cloudflare.com']},
+];
+const DEMO_METRICS = [
+  {seed_url:'https://github.com', mode:'bfs',      num_threads:1, max_pages:50, crawl_ms:4820, merge_ms:12, pagerank_ms:8,  scc_ms:3, topo_ms:2, pages_crawled:50, nodes:15, sccs:5, throughput:10.37},
+  {seed_url:'https://github.com', mode:'bfs',      num_threads:2, max_pages:50, crawl_ms:2910, merge_ms:14, pagerank_ms:8,  scc_ms:3, topo_ms:2, pages_crawled:50, nodes:15, sccs:5, throughput:17.18},
+  {seed_url:'https://github.com', mode:'bfs',      num_threads:4, max_pages:50, crawl_ms:1730, merge_ms:16, pagerank_ms:9,  scc_ms:3, topo_ms:2, pages_crawled:50, nodes:15, sccs:5, throughput:28.90},
+  {seed_url:'https://github.com', mode:'bfs',      num_threads:8, max_pages:50, crawl_ms:1120, merge_ms:18, pagerank_ms:9,  scc_ms:4, topo_ms:2, pages_crawled:50, nodes:15, sccs:5, throughput:44.64},
+  {seed_url:'https://github.com', mode:'priority', num_threads:4, max_pages:50, crawl_ms:1580, merge_ms:15, pagerank_ms:9,  scc_ms:3, topo_ms:2, pages_crawled:50, nodes:15, sccs:5, throughput:31.65},
+  {seed_url:'https://github.com', mode:'dfs',      num_threads:4, max_pages:50, crawl_ms:1890, merge_ms:16, pagerank_ms:8,  scc_ms:3, topo_ms:2, pages_crawled:50, nodes:15, sccs:5, throughput:26.45},
+];
+
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+window.addEventListener('DOMContentLoaded', async () => {
+  lucide.createIcons();
+  const online = await checkAPIStatus();
+  if (!online) {
+    // Load demo data so dashboard looks great even with API offline
+    loadDemoData();
+  } else {
+    // Try to load existing results (from a previous crawl)
+    try {
+      await loadAllData();
+    } catch (_) {
+      // No previous results yet — that's fine, user will start a crawl
+    }
+  }
+});
+
+function loadDemoData() {
+  STATE.pagerank = DEMO_PAGERANK.map(r => ({...r, pagerank_score: r.pagerank_score}));
+  STATE.scc      = DEMO_SCC;
+  STATE.metrics  = DEMO_METRICS;
+  STATE.crawled  = DEMO_PAGERANK.map(r => ({
+    domain:         r.domain,
+    outgoing_links: String(r.outgoing_links),
+    visit_count:    String(r.visit_count),
+  }));
+  renderAll();
+
+  // Banner
+  const banner = document.createElement('div');
+  banner.id = 'demo-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;text-align:center;padding:6px;font-size:11px;font-weight:600;letter-spacing:.05em;';
+  banner.textContent = '⚡ DEMO MODE — API offline. Start api_server.py to use live data. Showing sample crawl results.';
+  document.body.prepend(banner);
+  document.body.style.paddingTop = '28px';
+}
+</script>
+</html>

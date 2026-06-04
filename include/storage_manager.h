@@ -64,6 +64,14 @@ public:
      */
     void export_to_csv(const std::string& crawled_file, 
                        const std::string& ranking_file);
+
+    /**
+     * Dump all debug outputs (thread buffers, merged graph, domain stats, PageRank)
+     * This function is a convenience for main() and is guarded at compile-time
+     * by the DEBUG_DUMP macro. It performs read-only copies and does not add
+     * synchronization beyond existing container usage.
+     */
+    void dump_debug_outputs();
     
     /**
      * Get all domains in graph
@@ -79,6 +87,13 @@ public:
      * Get visit count for domain
      */
     int get_visit_count(const std::string& domain) const;
+
+    /**
+     * Get a const reference to the merged link graph.
+     * Call AFTER merge_all_buffers().
+     */
+    const std::unordered_map<std::string, std::vector<std::string>>&
+    get_link_graph() const { return link_graph; }
 
 private:
     std::vector<ThreadLocalBuffer> thread_buffers;

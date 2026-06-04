@@ -10,42 +10,48 @@
 #include "parser.h"
 
 /**
- * Manages worker thread pool
- * No locking - threads pull work from URLFrontier independently
+ * Manages the worker thread pool.
+ *
+ * Traversal mode is selected via the constructor:
+ *   ThreadManager crawler(TraversalMode::BFS);      // default
+ *   ThreadManager crawler(TraversalMode::DFS);
+ *   ThreadManager crawler(TraversalMode::PRIORITY);
  */
 class ThreadManager {
 public:
+    explicit ThreadManager(TraversalMode mode = TraversalMode::BFS)
+        : frontier(mode) {}
+
     /**
-     * Start crawling with worker threads
-     * @param num_threads Number of worker threads
-     * @param max_pages Maximum pages to crawl
-     * @param seed_url Starting URL
-     * @param storage_manager Storage manager instance
+     * Start crawling with worker threads.
+     * @param num_threads        Number of worker threads.
+     * @param max_pages          Maximum pages to crawl.
+     * @param seed_url           Starting URL.
+     * @param storage_manager    Storage manager instance.
      */
-    void start(int num_threads, int max_pages, 
+    void start(int num_threads, int max_pages,
                const std::string& seed_url,
                StorageManager& storage_manager);
-    
-    /**
-     * Wait for all threads to complete
-     */
+
+    /** Wait for all threads to complete. */
     void wait_completion();
-    
-    /**
-     * Get number of pages crawled so far
-     */
+
+    /** Dump frontier and visited snapshots for debugging (DEBUG_DUMP guard). */
+    void dump_frontier_and_visited();
+
+    /** Get number of pages crawled so far. */
     int get_pages_crawled() const;
 
 private:
     std::vector<std::thread> workers;
-    URLFrontier frontier;
-    std::atomic<int> pages_crawled{0};
-    std::atomic<int> max_pages_limit{0};
-    
+    URLFrontier              frontier;        // mode set in constructor
+    std::atomic<int>         pages_crawled{0};
+    std::atomic<int>         max_pages_limit{0};
+
     /**
-     * Worker thread main loop
-     * @param thread_id ID of this thread
-     * @param storage_manager Reference to storage
+     * Worker thread main loop.
+     * @param thread_id        ID of this thread.
+     * @param storage_manager  Reference to storage.
      */
     void worker_loop(int thread_id, StorageManager& storage_manager);
 };
