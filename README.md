@@ -1,250 +1,327 @@
-# Multi-Threaded Web Crawler with Graph Analytics
+# 🚀 High-Performance Intelligent Multi-Threaded Web Crawler and Graph Analytics Engine
 
-Production-grade web crawler featuring advanced graph algorithms, real-time monitoring, and interactive visualization dashboard.
+A high-performance C++ web crawling and graph analytics platform featuring multi-threaded crawling, BFS, DFS, and Priority Queue traversal strategies, PageRank computation, Tarjan SCC detection, Topological Sorting, KMP String Matching, REST API integration, and an interactive analytics dashboard for real-time visualization and performance benchmarking.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![C++](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)
-![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB.svg)
-
-## Features
-
-### Core Algorithms (All Optimized)
-- **BFS Traversal** - O(V+E) breadth-first crawling
-- **Priority Queue Crawling** - O(E log V) best-first search with heuristic scoring
-- **PageRank** - O(k·E) power iteration (30 iterations, damping=0.85)
-- **Tarjan SCC** - O(V+E) strongly connected components detection
-- **Topological Sort** - O(V+E) Kahn's algorithm on condensed DAG
-
-### Architecture
-- **Multi-threaded C++ backend** with thread-local buffers
-- **REST API** (Flask) for seamless frontend integration
-- **Interactive dashboard** with D3.js force-directed graphs
-- **Real-time progress monitoring** during crawls
-- **Automatic CSV export** (crawled_pages, pagerank_results, scc_results, topo_order, metrics)
-
-## Quick Start
-
-### Prerequisites
-
-**Linux/macOS:**
-```bash
-sudo apt install cmake build-essential libcurl4-openssl-dev python3 python3-pip
-```
-
-**Windows:**
-- Install CMake, Visual Studio (C++ tools), and Python 3
-- Or use WSL/Linux VM (recommended)
-
-### Build & Run
-
-```bash
-# 1. Clone and build
-git clone <your-repo-url>
-cd wub
-mkdir build && cd build
-cmake ..
-make  # or: cmake --build .
-
-# 2. Start API server (Terminal 1)
-cd ..
-pip install -r requirements.txt
-python api_server.py
-
-# 3. Start dashboard (Terminal 2)
-cd dashboard
-python -m http.server 8080
-
-# 4. Open browser
-# Visit: http://localhost:8080
-```
-
-### Direct CLI Usage
-
-```bash
-./build/crawler <seed_url> <max_pages> <num_threads> [mode]
-
-# Examples:
-./build/crawler https://github.com 100 4 bfs
-./build/crawler https://example.com 50 8 priority
-```
-
-**Arguments:**
-- `seed_url` - Starting URL (http:// or https://)
-- `max_pages` - Maximum pages to crawl (1-1000)
-- `num_threads` - Worker threads (1-16)
-- `mode` - Crawl strategy: `bfs` | `dfs` | `priority` (default: bfs)
-
-## Architecture
-
-```
-User enters URL → Dashboard (Tailwind + D3.js)
-                      ↓
-                  REST API (Flask :5000)
-                      ↓
-            C++ Multi-Threaded Crawler
-                      ↓
-         CSV Files (output/ directory)
-                      ↓
-         Auto-loaded by API → Dashboard
-```
-
-### Data Flow
-1. User submits crawl config via dashboard
-2. Frontend sends `POST /api/crawl` to Flask API
-3. API spawns C++ crawler subprocess
-4. Crawler generates 5 CSV files in `output/`
-5. API reads CSVs and serves JSON via endpoints
-6. Dashboard polls `/api/status` for live progress
-7. Results auto-load when crawl completes
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/crawl` | Start new crawl |
-| `GET` | `/api/status` | Live crawl progress |
-| `GET` | `/api/pagerank` | PageRank results |
-| `GET` | `/api/scc` | SCC community detection |
-| `GET` | `/api/topo` | Topological sort order |
-| `GET` | `/api/metrics` | Performance metrics |
-| `GET` | `/api/graph-data` | D3 visualization data |
-
-## Output Files
-
-All CSVs are written to `output/` directory:
-
-- **crawled_pages.csv** - Domain, outgoing_links, visit_count
-- **pagerank_results.csv** - Domain, pagerank_score
-- **scc_results.csv** - SCC ID, size, member domains
-- **topo_order.csv** - Topological rank, SCC ID, representative domain
-- **metrics.csv** - Timing, throughput, algorithm performance
-
-## Performance
-
-Tested on 8-core machine with 50-page crawls:
-
-| Threads | Crawl Time | Throughput | Speedup |
-|---------|------------|------------|---------|
-| 1       | 4820 ms    | 10.4 p/s   | 1.0x    |
-| 2       | 2910 ms    | 17.2 p/s   | 1.66x   |
-| 4       | 1730 ms    | 28.9 p/s   | 2.79x   |
-| 8       | 1120 ms    | 44.6 p/s   | 4.30x   |
-
-## Testing
-
-```bash
-# Test all API endpoints
-python test_api.py
-
-# Generate metrics report
-python metrics_analyzer.py
-```
-
-## Project Structure
-
-```
-wub/
-├── src/                    # C++ source files
-│   ├── main.cpp           # Entry point
-│   ├── downloader.cpp     # HTTP client
-│   ├── parser.cpp         # HTML parsing
-│   ├── url_frontier.cpp   # Queue management
-│   ├── storage_manager.cpp # Graph storage
-│   ├── thread_manager.cpp # Worker pool
-│   ├── graph_algorithms.cpp # PageRank, SCC, Topo
-│   └── url_scorer.cpp     # Priority scoring
-├── include/               # Header files
-├── dashboard/
-│   └── index.html        # Interactive UI
-├── output/               # Generated CSV files
-├── api_server.py         # REST API
-├── test_api.py           # API tests
-├── metrics_analyzer.py   # Performance analysis
-├── requirements.txt      # Python dependencies
-├── CMakeLists.txt        # Build configuration
-└── README.md             # This file
-```
-
-## Algorithm Details
-
-### PageRank Power Iteration
-```
-PR(v) = (1-d)/N + d × Σ(PR(u)/L(u))
-```
-- Damping factor: 0.85
-- Iterations: 30
-- Convergence: Stable after ~20 iterations
-
-### Tarjan's SCC
-- Single-pass DFS with discovery/low-link times
-- Stack-based component extraction
-- Identifies web communities (mutual link cycles)
-
-### URL Scoring (Priority Queue)
-Multi-factor heuristic:
-- Trusted domains (GitHub, StackOverflow, etc.)
-- Keywords (docs, api, tutorial, etc.)
-- URL depth penalty
-- Seed proximity bonus
-
-## Demo Day Checklist
-
-- [ ] Build crawler binary
-- [ ] Start API server on port 5000
-- [ ] Start dashboard on port 8080
-- [ ] Run test crawl: `https://github.com`
-- [ ] Show live progress display
-- [ ] Navigate to Analytics → show interactive graph
-- [ ] Navigate to Benchmarks → show performance metrics
-- [ ] Explain algorithm complexity (all O(V+E) except Priority=O(E log V))
-
-## Troubleshooting
-
-**Crawler binary not found:**
-```bash
-cd build
-cmake ..
-make
-```
-
-**API connection failed:**
-- Check `python api_server.py` is running
-- Verify port 5000 is not in use
-- Check firewall settings
-
-**Empty dashboard:**
-- API must be running first
-- Run at least one crawl to generate CSV data
-- Check browser console (F12) for errors
-
-**Build errors on Windows:**
-- Install CMake from cmake.org
-- Install Visual Studio with C++ support
-- Or use WSL/Linux VM (easier)
-
-## License
-
-MIT License - Feel free to use for academic projects
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
-
-## Acknowledgments
-
-Built as part of Design & Analysis of Algorithms course project.
-
-**Tech Stack:**
-- C++17 (STL, threading)
-- Python 3 (Flask, Flask-CORS)
-- JavaScript (D3.js, Chart.js, Tailwind CSS)
-- libcurl (HTTP client)
-- CMake (build system)
+![C++](https://img.shields.io/badge/C%2B%2B-17-blue)
+![Multi-Threaded](https://img.shields.io/badge/Concurrency-MultiThreaded-green)
+![Algorithms](https://img.shields.io/badge/Algorithms-DAA-orange)
+![Graph Analytics](https://img.shields.io/badge/Graph-Analytics-purple)
 
 ---
 
-**For detailed algorithm explanations and viva questions, see course documentation.**
+## ✨ Highlights
+
+* Multi-threaded web crawling engine
+* BFS, DFS, and Priority Queue crawling strategies
+* PageRank implementation
+* Tarjan Strongly Connected Components (SCC)
+* Topological Sort visualization
+* KMP String Matching
+* Interactive Graph Analytics Dashboard
+* REST API backend
+* Thread-local buffering optimization
+* Real-time performance benchmarking
+* Scalable graph construction and analysis
+
+---
+
+## 📸 Dashboard Preview
+
+### Graph Analytics Dashboard
+
+![Graph Analytics](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.03.08.jpeg)
+
+### Algorithm Benchmark Comparison
+
+![Benchmarks](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.03.23.jpeg)
+
+### Tarjan SCC Community Graph
+
+![Tarjan SCC](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.03.52.jpeg)
+
+### SCC Communities Visualization
+
+![SCC Communities](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.04.10.jpeg)
+
+### PageRank Analysis Dashboard
+
+![PageRank](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.04.30.jpeg)
+
+### Topological Sort Visualization
+
+![Topology](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.04.43.jpeg)
+
+### Real-Time Queue Monitoring
+
+![Queue Monitoring](assets/screenshots/WhatsApp%20Image%202026-06-05%20at%2000.05.00.jpeg)
+
+---
+
+## 🔥 Features
+
+### Multi-Threaded Crawling
+
+* Parallel URL fetching using worker threads
+* Thread-local buffering to reduce synchronization overhead
+* High throughput with near-linear scalability
+* Deadlock-free and thread-safe architecture
+
+### Intelligent Traversal Strategies
+
+* Breadth First Search (BFS)
+* Depth First Search (DFS)
+* Priority Queue Based Crawling
+
+### Graph Analytics
+
+* Web Graph Construction
+* PageRank Computation
+* Tarjan Strongly Connected Components (SCC)
+* Topological Sorting
+* Domain Importance Ranking
+
+### String Matching & Search
+
+* KMP (Knuth-Morris-Pratt) String Matching
+* Fast keyword detection in crawled pages
+* Efficient pattern searching across datasets
+
+### Data Processing
+
+* Automatic URL extraction
+* Duplicate URL detection
+* Domain frequency analysis
+* Link relationship mapping
+
+### Visualization & Analytics
+
+* Interactive Dashboard
+* Graph Visualization
+* Crawl Statistics
+* Performance Metrics
+* Ranking Reports
+* SCC Community Analysis
+
+### API Support
+
+* REST API Integration
+* CSV Export Support
+* Real-Time Data Access
+
+---
+
+## 🏗️ System Architecture
+
+The platform follows a MapReduce-inspired workflow for scalable crawling and analysis.
+
+### Phase 1: Crawl (Map)
+
+* Multiple worker threads fetch pages concurrently
+* URLs processed using BFS, DFS, or Priority Scheduling
+* Extracted links stored in thread-local buffers
+
+### Phase 2: Merge (Shuffle)
+
+* Thread-local results aggregated
+* Unified web graph constructed
+* Duplicate URLs eliminated
+
+### Phase 3: Analyze (Reduce)
+
+* PageRank computation
+* Tarjan SCC detection
+* Topological Sorting
+* KMP keyword matching
+* Analytics generation and visualization
+
+---
+
+## 🧠 Algorithms Used
+
+| Category         | Algorithm              |
+| ---------------- | ---------------------- |
+| Traversal        | BFS                    |
+| Traversal        | DFS                    |
+| Scheduling       | Priority Queue         |
+| Graph Analysis   | PageRank               |
+| Graph Analysis   | Tarjan SCC             |
+| Graph Analysis   | Topological Sort       |
+| Pattern Matching | KMP String Matching    |
+| Concurrency      | Multi-threading        |
+| Optimization     | Thread-Local Buffering |
+
+---
+
+## 📊 Performance Benchmarks
+
+| Strategy       | Avg Time (ms) | Throughput (pages/sec) |
+| -------------- | ------------- | ---------------------- |
+| BFS            | 15008         | 5.56                   |
+| Priority Queue | 20988         | 3.16                   |
+| DFS            | 28533         | 1.89                   |
+
+### 🏆 Recommended Strategy
+
+**BFS** achieved the highest throughput and lowest execution time, making it the preferred crawling strategy for large-scale web graph exploration.
+
+---
+
+## ⚙️ Installation & Setup
+
+### Prerequisites
+
+* C++17 or later
+* GCC / G++
+* Git
+* CMake
+* libcurl
+* nlohmann/json
+
+### Clone Repository
+
+```bash
+git clone https://github.com/ishaanparikh14/High-Performance-Intelligent-Multi-Threaded-Web-Crawler-and-Graph-Analytics-Engine.git
+
+cd High-Performance-Intelligent-Multi-Threaded-Web-Crawler-and-Graph-Analytics-Engine
+```
+
+### Install Dependencies (Ubuntu)
+
+```bash
+sudo apt update
+
+sudo apt install -y \
+g++ \
+cmake \
+libcurl4-openssl-dev \
+nlohmann-json3-dev
+```
+
+### Build Project
+
+```bash
+chmod +x build.sh
+
+./build.sh
+```
+
+### Run Crawler
+
+```bash
+./crawler bfs
+```
+
+```bash
+./crawler dfs
+```
+
+```bash
+./crawler priority
+```
+
+### Launch Dashboard
+
+```bash
+cd dashboard
+
+python3 -m http.server 3000
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+---
+
+## 📁 Project Structure
+
+```text
+project/
+│
+├── crawler/
+│   ├── bfs_crawler.cpp
+│   ├── dfs_crawler.cpp
+│   ├── priority_crawler.cpp
+│
+├── graph/
+│   ├── pagerank.cpp
+│   ├── tarjan_scc.cpp
+│   ├── topological_sort.cpp
+│
+├── search/
+│   └── kmp.cpp
+│
+├── api/
+│
+├── dashboard/
+│
+├── assets/
+│   └── screenshots/
+│
+├── output/
+│
+└── README.md
+```
+---
+
+## ⚡ Key Optimizations
+
+### Thread-Local Buffering
+
+Each worker thread maintains its own private buffer before synchronization, significantly reducing lock contention.
+
+### Minimal Locking Strategy
+
+Mutexes are used only for critical shared resources, minimizing synchronization overhead.
+
+### Efficient Graph Representation
+
+The crawler stores relationships as graph edges rather than adjacency matrices, improving scalability and memory efficiency.
+
+---
+
+## 📈 Sample Outputs
+
+### Crawling Outputs
+
+* Crawled Pages
+* URL Frontier Dumps
+* Thread Buffers
+* Domain Statistics
+
+### Graph Analytics
+
+* PageRank Scores
+* SCC Communities
+* Topological Order
+* Graph Metrics
+
+### Benchmark Reports
+
+* Execution Time
+* Throughput
+* Strategy Comparison
+
+---
+
+## 🔮 Future Enhancements
+
+* Bloom Filter duplicate detection
+* Distributed crawling architecture
+* AI-powered URL prioritization
+* Incremental PageRank
+* Real-time graph streaming
+* Distributed graph analytics
+
+---
+
+## 📜 License
+
+This project is intended for educational and research purposes.
+
+
+---
+
+
