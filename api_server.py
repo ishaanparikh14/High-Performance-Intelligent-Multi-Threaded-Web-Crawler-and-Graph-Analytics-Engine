@@ -11,7 +11,7 @@ Architecture:
 Live progress is tracked by monitoring the crawler's stdout in real time.
 """
 
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, send_from_directory
 from flask_cors import CORS
 import subprocess
 import csv
@@ -22,8 +22,13 @@ import threading
 import time
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 CORS(app)  # Enable CORS for dashboard
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dashboard directory
+# ─────────────────────────────────────────────────────────────────────────────
+DASHBOARD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Global crawl state  (single-crawl-at-a-time model)
@@ -172,10 +177,11 @@ def run_crawler(seed_url, strategy, max_pages, threads):
                     pages_seen = int(line.split(":")[-1].strip())
                     elapsed = time.time() - start_time
                     tput    = pages_seen / elapsed if elapsed > 0 else 0
+                    progress = min(100, int((pages_seen / max_pages) * 100))
                     with crawl_lock:
                         crawl_status["pages_crawled"]    = pages_seen
                         crawl_status["throughput"]       = round(tput, 2)
-                        crawl_status["progress_percent"] = 80
+                        crawl_status["progress_percent"] = progress
                 except Exception:
                     pass
 
@@ -188,18 +194,27 @@ def run_crawler(seed_url, strategy, max_pages, threads):
                 except Exception:
                     pass
 
-            # Incremental estimate while crawling
-            if "pages" in line.lower() and "crawled" in line.lower():
-                elapsed = time.time() - start_time
-                if elapsed > 0 and pages_seen < max_pages:
-                    pages_seen += 1
-                    tput = pages_seen / elapsed
-                    pct  = min(55, int(pages_seen / max_pages * 55))
-                    with crawl_lock:
-                        crawl_status["pages_crawled"]    = pages_seen
-                        crawl_status["queue_size"]       = max(0, max_pages - pages_seen)
-                        crawl_status["throughput"]       = round(tput, 2)
-                        crawl_status["progress_percent"] = pct
+            # Incremental estimate while crawling - look for progress lines
+            if "[PROGRESS]" in line or "Pages:" in line:
+                try:
+                    # Parse: [PROGRESS] Pages: X/Y | Queue: Z
+                    if "Pages:" in line:
+                        parts = line.split("Pages:")[1].split("|")[0].strip()
+                        if "/" in parts:
+                            current = int(parts.split("/")[0].strip())
+                            if current > pages_seen:
+                                pages_seen = current
+                                elapsed = time.time() - start_time
+                                if elapsed > 0:
+                                    tput = pages_seen / elapsed
+                                    progress = min(99, int((pages_seen / max_pages) * 100))
+                                    with crawl_lock:
+                                        crawl_status["pages_crawled"]    = pages_seen
+                                        crawl_status["queue_size"]       = max(0, max_pages - pages_seen)
+                                        crawl_status["throughput"]       = round(tput, 2)
+                                        crawl_status["progress_percent"] = progress
+                except Exception as e:
+                    pass
 
         process.wait(timeout=360)
         rc = process.returncode
@@ -234,7 +249,13 @@ def run_crawler(seed_url, strategy, max_pages, threads):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.route("/")
-def index():
+def dashboard():
+    """Serve the dashboard HTML"""
+    return send_from_directory(DASHBOARD_DIR, "index.html")
+
+
+@app.route("/api")
+def api_index():
     return jsonify({
         "name":    "Web Crawler API",
         "version": "2.0.0",
@@ -296,7 +317,13 @@ def start_crawl():
 @app.route("/api/status")
 def get_status():
     with crawl_lock:
-        return jsonify(dict(crawl_status))
+        status_copy = dict(crawl_status)
+        # Calculate progress percentage based on pages crawled
+        if status_copy["max_pages"] > 0 and status_copy["status"] == "running":
+            pages = status_copy["pages_crawled"]
+            max_p = status_copy["max_pages"]
+            status_copy["progress_percent"] = min(100, int((pages / max_p) * 100))
+        return jsonify(status_copy)
 
 
 @app.route("/api/pagerank")
@@ -400,6 +427,102 @@ def get_graph_data():
 @app.route("/api/crawled")
 def get_crawled():
     return jsonify(read_csv("crawled_pages.csv"))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KMP String Matching  —  POST /api/search
+#
+# Searches a keyword across all crawled domain names using KMP O(n + m).
+# Returns every domain that contains the keyword, plus match positions.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def kmp_failure(pattern: str) -> list:
+    """Build KMP failure/prefix table.  O(m)"""
+    m = len(pattern)
+    fail = [0] * m
+    k = 0
+    for i in range(1, m):
+        while k > 0 and pattern[k] != pattern[i]:
+            k = fail[k - 1]
+        if pattern[k] == pattern[i]:
+            k += 1
+        fail[i] = k
+    return fail
+
+
+def kmp_search_positions(text: str, pattern: str) -> list:
+    """Return list of start positions (0-based) where pattern occurs in text.  O(n + m)"""
+    if not pattern:
+        return []
+    n, m = len(text), len(pattern)
+    fail = kmp_failure(pattern)
+    positions = []
+    q = 0
+    for i in range(n):
+        while q > 0 and text[i] != pattern[q]:
+            q = fail[q - 1]
+        if text[i] == pattern[q]:
+            q += 1
+        if q == m:
+            positions.append(i - m + 1)
+            q = fail[q - 1]
+    return positions
+
+
+@app.route("/api/search", methods=["POST"])
+def kmp_search_endpoint():
+    data    = request.get_json(force=True) or {}
+    keyword = str(data.get("keyword", "")).strip().lower()
+
+    if not keyword:
+        return jsonify({"error": "keyword is required"}), 400
+    if len(keyword) > 200:
+        return jsonify({"error": "keyword too long (max 200 chars)"}), 400
+
+    crawled = read_csv("crawled_pages.csv")
+    if not crawled:
+        return jsonify({"error": "No crawled data. Run a crawl first."}), 404
+
+    # Build failure table once — reuse for every domain  O(m)
+    fail = kmp_failure(keyword)
+
+    results = []
+    for row in crawled:
+        domain = row.get("domain", "")
+        text   = domain.lower()
+
+        # KMP search: find all positions  O(n + m)
+        positions = kmp_search_positions(text, keyword)
+
+        if positions:
+            results.append({
+                "domain":         domain,
+                "match_count":    len(positions),
+                "positions":      positions,
+                "outgoing_links": int(row.get("outgoing_links", 0)),
+                "visit_count":    int(row.get("visit_count", 1)),
+            })
+
+    # Sort by match count descending, then domain alphabetically
+    results.sort(key=lambda x: (-x["match_count"], x["domain"]))
+
+    return jsonify({
+        "keyword":       keyword,
+        "pattern_length": len(keyword),
+        "failure_table": fail,
+        "total_domains_searched": len(crawled),
+        "matches_found": len(results),
+        "results":       results,
+    })
+
+
+@app.route("/output/<filename>")
+def serve_csv(filename):
+    """Serve CSV files for download."""
+    try:
+        return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+    except FileNotFoundError:
+        return jsonify({"error": f"File {filename} not found"}), 404
 
 
 # ─────────────────────────────────────────────────────────────────────────────

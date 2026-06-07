@@ -1,0 +1,13 @@
+SRC_DOMAIN -> DEST_DOMAIN
+rvce.edu.in -> gmpg.org
+rvce.edu.in -> rvce.edu.in
+rvce.edu.in -> maps.app.goo.gl
+rvce.edu.in -> facebook.com
+rvce.edu.in -> instagram.com
+rvce.edu.in -> linkedin.com
+rvce.edu.in -> twitter.com
+rvce.edu.in -> grievance.rvce.edu.in
+rvce.edu.in -> swayam.gov.in
+rvce.edu.in -> vlab.co.in
+rvce.edu.in -> vlabs.co.on
+rvce.edu.in -> rvce.rveducationalinstitutions.com
